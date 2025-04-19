@@ -50,8 +50,8 @@ class AuthSystem:
     def __update_user_in_db(self, con_type, con_val, key, key_val):
         cursor = self.db.conn.cursor()
         try:
-            cursor.execute(f"UPDATE users SET {con_type} = ? WHERE {key} = ?;",
-                           (con_val, key_val))
+            cursor.execute(f"UPDATE users SET {key} = ? WHERE {con_type} = ?;",
+                           (key_val, con_val))
             self.db.conn.commit()
         finally:
             cursor.close()
@@ -102,10 +102,12 @@ class AuthSystem:
 
     def forget_password(self, id_, username, role, new_password):
         user = self.__get_user_from_db("username", username)
-        if id_ == user[0] and role == user[3]:
+        if user and id_ == str(user[0]) and role == user[3]:
             new_password = self.__hash_password(new_password)
             self.__update_user_in_db("username", username,
                                      "password_hash", new_password)
+            return True
+        return False
 
     def update_password(self, username, old_pass, new_pass):
         user = self.__get_user_from_db("username", username)
@@ -121,10 +123,9 @@ class AuthSystem:
             self.__update_user_in_db("username", new_username,
                                      "id", user[0])
             return True
-
         return False
 
-    # admin only methods
+    # admin methods
     def update_role(self, username, role, admin_password):
         if self.is_admin():
             user = self.__get_user_from_db("username", username)
@@ -140,12 +141,14 @@ class AuthSystem:
             user = self.__get_user_from_db("username", username)
             if user and admin_password == self.current_user["password"]:
                 self.__remove_user_from_db(username)
+                return True
+        return False
 
     def is_admin(self):
         """Check if current user is an admin"""
         return self.current_user and self.current_user['role'] == 'admin'
 
-    # testing methods, delete after dev
+    # testing methods, will delete after
     def print_users(self):
         for i in self.__get_all_users_from_db():
             for j in i:

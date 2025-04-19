@@ -114,6 +114,10 @@ class InventoryUI:
                   text="Register",
                   command=self.show_register_screen).pack(side=tk.LEFT, padx=5)
 
+        ttk.Button(button_frame,
+                   text="Forget Password",
+                   command=self.show_forget_pass_screen).pack(side=tk.LEFT, padx=5)
+
     def show_main_screen(self):
         # Clear window
         for widget in self.root.winfo_children():
@@ -919,6 +923,86 @@ class InventoryUI:
             self.show_login_screen()
         else:
             messagebox.showerror("Error", "Username already exists")
+
+    def handle_forget_pass(self):
+        userid = self.for_id_var.get()
+        username = self.for_username_var.get()
+        role = self.for_role_var.get()
+        new_password1 = self.new_for_password1_var.get()
+        new_password2 = self.new_for_password2_var.get()
+
+        if not (userid and username and role and new_password1 and new_password2):
+            messagebox.showerror("Error", "Please fill in all fields")
+            return
+
+        # print("change", self.auth_system.forget_password(userid, username, role, new_password))
+        if new_password1 == new_password2 and self.auth_system.forget_password(userid, username, role, new_password1):
+            messagebox.showinfo("Success", "Password change successful! Please login.")
+            self.show_login_screen()
+        else:
+            messagebox.showerror("Error", "Invalid info.")
+
+    def show_forget_pass_screen(self):
+        # Clear window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Create main frame
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Title
+        title_label = ttk.Label(main_frame,
+                                text="Forget Password",
+                                font=('Helvetica', 24, 'bold'))
+        title_label.pack(pady=20)
+
+        # Form
+        form_frame = ttk.Frame(main_frame)
+        form_frame.pack(pady=20)
+
+        #ID
+        ttk.Label(form_frame, text="ID:", font=('Helvetica', 12)).pack()
+        self.for_id_var = tk.StringVar()
+        username_entry = ttk.Entry(form_frame, textvariable=self.for_id_var, width=30)
+        username_entry.pack(pady=5)
+
+        # Username
+        ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
+        self.for_username_var = tk.StringVar()
+        username_entry = ttk.Entry(form_frame, textvariable=self.for_username_var, width=30)
+        username_entry.pack(pady=5)
+
+        # Role
+        ttk.Label(form_frame, text="Role:", font=('Helvetica', 12)).pack()
+        self.for_role_var = tk.StringVar()
+        password_entry = ttk.Entry(form_frame, textvariable=self.for_role_var, width=30)
+        password_entry.pack(pady=5)
+
+        # New Password1
+        ttk.Label(form_frame, text="New Password:", font=('Helvetica', 12)).pack()
+        self.new_for_password1_var = tk.StringVar()
+        password_entry = ttk.Entry(form_frame, textvariable=self.new_for_password1_var, show="•", width=30)
+        password_entry.pack(pady=5)
+
+        # New Password2
+        ttk.Label(form_frame, text="New Password:", font=('Helvetica', 12)).pack()
+        self.new_for_password2_var = tk.StringVar()
+        password_entry = ttk.Entry(form_frame, textvariable=self.new_for_password2_var, show="•", width=30)
+        password_entry.pack(pady=5)
+
+        # Buttons
+        button_frame = ttk.Frame(form_frame)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame,
+                   text="Change",
+                   command=self.handle_forget_pass).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(button_frame,
+                   text="Back to Login",
+                   command=self.show_login_screen).pack(side=tk.LEFT, padx=5)
+
 
     def run(self):
         self.root.mainloop()
