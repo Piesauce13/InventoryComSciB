@@ -132,4 +132,3 @@ class AuthSystem:
             print(i)
         print(self.__get_user_from_db("username", "james"))
 
-print(AuthSystem.__name__)
