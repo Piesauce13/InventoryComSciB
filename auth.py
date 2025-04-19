@@ -84,6 +84,13 @@ class AuthSystem:
         self.current_user = None
         return True
 
+    def forget_password(self, id, username, role, new_password):
+        user = self.__get_user_from_db("username", username)
+        if id == user[0] and role == user[3]:
+            new_password = self.__hash_password(new_password)
+            self.__update_user_in_db("username", username,
+                                     "password_hash", new_password)
+
     def update_password(self, username, old_pass, new_pass):
         user = self.__get_user_from_db("username", username)
         if user and user[2] == self.__hash_password(old_pass):
@@ -124,3 +131,5 @@ class AuthSystem:
         for i in self.__get_all_users_from_db():
             print(i)
         print(self.__get_user_from_db("username", "james"))
+
+print(AuthSystem.__name__)
