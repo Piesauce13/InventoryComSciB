@@ -204,7 +204,7 @@ class InventoryUI:
                  font=('Helvetica', 20, 'bold')).pack(pady=10)
         
         # Create table
-        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity')
+        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity', 'Expiry Date', 'Manufacture Date', 'Notes')
         tree = ttk.Treeview(self.content_area, columns=columns, show='headings')
         
         # Configure columns
@@ -228,7 +228,10 @@ class InventoryUI:
                 product['name'],
                 product['category'],
                 f"${product['price']:.2f}",
-                product['quantity']
+                product['quantity'],
+                product['expiry_date'] if product['expiry_date'] else 'N/A',
+                product['mfg_date'] if product['mfg_date'] else 'N/A',
+                product['notes'] if product['notes'] else 'N/A'
             ))
 
     def show_add_product(self):
@@ -343,8 +346,15 @@ class InventoryUI:
                                      maxdate=datetime.now())  # Can't be future date
         fields['mfg_date'].grid(row=0, column=1, padx=5, pady=5)
         
+        # Has Expiry Date Checkbox
+        has_expiry_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(dates_info, 
+                       text="Product has expiry date",
+                       variable=has_expiry_var,
+                       command=lambda: fields['expiry_date'].configure(state='normal' if has_expiry_var.get() else 'disabled')).grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+        
         # Expiry Date
-        ttk.Label(dates_info, text="Expiry Date:").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(dates_info, text="Expiry Date:").grid(row=2, column=0, padx=5, pady=5)
         fields['expiry_date'] = DateEntry(dates_info, 
                                         width=20, 
                                         background=self.colors['primary'],
@@ -352,41 +362,13 @@ class InventoryUI:
                                         borderwidth=2,
                                         date_pattern='yyyy-mm-dd',
                                         mindate=datetime.now())  # Must be future date
-        fields['expiry_date'].grid(row=1, column=1, padx=5, pady=5)
+        fields['expiry_date'].grid(row=2, column=1, padx=5, pady=5)
         
-        # Add date validation
-        def validate_dates(*args):
-            try:
-                mfg_date = fields['mfg_date'].get_date()
-                exp_date = fields['expiry_date'].get_date()
-                
-                if mfg_date > datetime.now().date():
-                    messagebox.showerror("Error", "Manufacturing date cannot be in the future")
-                    fields['mfg_date'].set_date(datetime.now())
-                    return False
-                
-                if exp_date <= mfg_date:
-                    messagebox.showerror("Error", "Expiry date must be after manufacturing date")
-                    fields['expiry_date'].set_date(mfg_date + timedelta(days=1))
-                    return False
-                
-                return True
-            except Exception as e:
-                messagebox.showerror("Error", f"Invalid date format: {str(e)}")
+        def validate_dates():
+            if has_expiry_var.get() and not fields['expiry_date'].get():
+                messagebox.showerror("Error", "Please select an expiry date")
                 return False
-
-        # Bind validation to date changes
-        fields['mfg_date'].bind("<<DateEntrySelected>>", validate_dates)
-        fields['expiry_date'].bind("<<DateEntrySelected>>", validate_dates)
-        
-        # Additional Information Section
-        additional_info = ttk.LabelFrame(form_frame, text="Additional Information", padding=10)
-        additional_info.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Notes
-        ttk.Label(additional_info, text="Notes:").pack(anchor='w', padx=5, pady=5)
-        fields['notes'] = tk.Text(additional_info, height=4, width=50)
-        fields['notes'].pack(padx=5, pady=5, fill=tk.X)
+            return True
         
         def save_product():
             try:
@@ -408,7 +390,7 @@ class InventoryUI:
                     'quantity': int(fields['quantity'].get()),
                     'min_stock_level': int(fields['min_stock'].get()),
                     'mfg_date': fields['mfg_date'].get_date().strftime('%Y-%m-%d'),
-                    'expiry_date': fields['expiry_date'].get_date().strftime('%Y-%m-%d'),
+                    'expiry_date': fields['expiry_date'].get_date().strftime('%Y-%m-%d') if has_expiry_var.get() else None,
                     'notes': fields['notes'].get("1.0", tk.END).strip()
                 }
                 
@@ -640,7 +622,7 @@ class InventoryUI:
                  font=('Helvetica', 20, 'bold')).pack(pady=10)
         
         # Create table
-        columns = ('ID', 'Name', 'Category', 'Expiry Date')
+        columns = ('ID', 'Name', 'Category', 'Quantity', 'Expiry Date', 'Manufacture Date', 'Notes')
         tree = ttk.Treeview(self.content_area, columns=columns, show='headings')
         
         for col in columns:
@@ -660,7 +642,10 @@ class InventoryUI:
                 product['id'],
                 product['name'],
                 product['category'],
-                product['expiry_date']
+                product['quantity'],
+                product['expiry_date'],
+                product['mfg_date'] if product['mfg_date'] else 'N/A',
+                product['notes'] if product['notes'] else 'N/A'
             ))
 
     def show_sort_products(self):

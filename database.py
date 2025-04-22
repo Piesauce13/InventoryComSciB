@@ -33,12 +33,9 @@ class Database:
         )
         ''')
         
-        # Drop existing products table if it exists
-        cursor.execute('DROP TABLE IF EXISTS products')
-        
         # Create products table with new schema
         cursor.execute('''
-        CREATE TABLE products (
+        CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
