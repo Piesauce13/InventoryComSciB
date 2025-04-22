@@ -364,6 +364,14 @@ class InventoryUI:
                                         mindate=datetime.now())  # Must be future date
         fields['expiry_date'].grid(row=2, column=1, padx=5, pady=5)
         
+        # Notes Section
+        notes_info = ttk.LabelFrame(form_frame, text="Notes", padding=10)
+        notes_info.pack(fill=tk.X, padx=10, pady=5)
+        
+        # Notes Text Area
+        fields['notes'] = tk.Text(notes_info, height=4, width=50)
+        fields['notes'].pack(padx=5, pady=5, fill=tk.X)
+        
         def validate_dates():
             if has_expiry_var.get() and not fields['expiry_date'].get():
                 messagebox.showerror("Error", "Please select an expiry date")
