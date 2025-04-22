@@ -3,6 +3,10 @@ from tkinter import ttk, messagebox
 from datetime import datetime, timedelta
 from tkcalendar import DateEntry  # You'll need to install this: pip install tkcalendar
 import tkinter.font as tkfont
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from collections import defaultdict
+
 
 class InventoryUI:
     def __init__(self, auth_system, inventory_manager):
