@@ -168,7 +168,11 @@ class InventoryUI:
         ttk.Button(sidebar,
                   text="Delete Product",
                   command=self.show_delete_product).pack(fill=tk.X, pady=5)
-        
+
+        ttk.Button(sidebar,
+                   text="Show Statistics",
+                   command=self.show_statistic).pack(fill=tk.X, pady=20)
+
         if self.auth_system.is_admin():
             ttk.Button(sidebar,
                       text="Manage Users",
@@ -1003,6 +1007,54 @@ class InventoryUI:
                    text="Back to Login",
                    command=self.show_login_screen).pack(side=tk.LEFT, padx=5)
 
+    def show_statistic(self):
+        # Clear content area
+        for widget in self.content_area.winfo_children():
+            widget.destroy()
+
+        ttk.Label(self.content_area,
+                  text="Inventory Statistics",
+                  font=self.fonts['title']).pack(pady=10)
+
+        # Get current products
+        products = self.inventory_manager.get_all_products()
+
+        if not products:
+            ttk.Label(self.content_area,
+                      text="No products available for statistics.",
+                      font=self.fonts['normal']).pack(pady=20)
+            return
+
+        # Prepare data
+        product_names = [p['name'] for p in products]
+        stock_quantities = [p['quantity'] for p in products]
+
+        category_totals = defaultdict(int)
+        for p in products:
+            category_totals[p['category']] += p['quantity']
+
+        categories = list(category_totals.keys())
+        quantities_by_category = list(category_totals.values())
+
+        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+        fig.tight_layout(pad=5)
+
+        # Bar chart for stock quantity by product
+        axs[0].bar(product_names, stock_quantities, color='skyblue')
+        axs[0].set_title('Current Stock by Product')
+        axs[0].set_xlabel('Product Name')
+        axs[0].set_ylabel('Quantity in Stock')
+        axs[0].tick_params(axis='x', rotation=45)
+
+        # Pie chart for category totals
+        axs[1].pie(quantities_by_category, labels=categories, autopct='%1.1f%%', startangle=90)
+        axs[1].axis('equal')
+        axs[1].set_title('Inventory Distribution by Category')
+
+        # Embed the figure into Tkinter
+        canvas = FigureCanvasTkAgg(fig, master=self.content_area)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def run(self):
         self.root.mainloop()
