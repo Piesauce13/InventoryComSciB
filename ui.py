@@ -1008,24 +1008,36 @@ class InventoryUI:
         # Clear content area
         for widget in self.content_area.winfo_children():
             widget.destroy()
-
-        ttk.Label(self.content_area,
-                  text="Inventory Statistics",
-                  font=self.fonts['title']).pack(pady=10)
-
+        
+        # Create scrollable canvas
+        canvas = tk.Canvas(self.content_area, bg=self.colors['bg'])
+        scrollbar = ttk.Scrollbar(self.content_area, orient="vertical", command=canvas.yview)
+        
+        scrollable_frame = ttk.Frame(canvas, style='Main.TFrame')
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Title
+        ttk.Label(scrollable_frame,
+                text="Inventory Statistics",
+                font=self.fonts['title'],
+                background=self.colors['bg']).pack(pady=20)
+        
         # Get current products
         products = self.inventory_manager.get_all_products()
 
         if not products:
-            ttk.Label(self.content_area,
-                      text="No products available for statistics.",
-                      font=self.fonts['normal']).pack(pady=20)
+            ttk.Label(scrollable_frame,
+                    text="No products available for statistics.",
+                    font=self.fonts['normal']).pack(pady=20)
             return
 
-        # Prepare data
-        product_names = [p['name'] for p in products]
-        stock_quantities = [p['quantity'] for p in products]
-
+        # Prepare data for product distribution by category
         category_totals = defaultdict(int)
         for p in products:
             category_totals[p['category']] += p['quantity']
@@ -1033,25 +1045,175 @@ class InventoryUI:
         categories = list(category_totals.keys())
         quantities_by_category = list(category_totals.values())
 
-        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-        fig.tight_layout(pad=5)
+        # Group products by creation date
+        # First, convert timestamp strings to datetime objects
+        for product in products:
+            if 'created_at' in product and product['created_at']:
+                try:
+                    # Parse the timestamp (SQLite default format is 'YYYY-MM-DD HH:MM:SS')
+                    product['creation_date'] = datetime.strptime(product['created_at'], '%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    # Set a default date for products with invalid date format
+                    product['creation_date'] = datetime.now() - timedelta(days=30)
+            else:
+                # Default for products without creation date
+                product['creation_date'] = datetime.now() - timedelta(days=30)
 
-        # Bar chart for stock quantity by product
-        axs[0].bar(product_names, stock_quantities, color='skyblue')
-        axs[0].set_title('Current Stock by Product')
-        axs[0].set_xlabel('Product Name')
-        axs[0].set_ylabel('Quantity in Stock')
-        axs[0].tick_params(axis='x', rotation=45)
+        # Group by month and year
+        date_counts = defaultdict(int)
+        
+        # Define the date range (last 6 months)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=180)  # approximately 6 months
+        
+        # Initialize all months to ensure they appear on the graph even if no products were added
+        current_date = start_date
+        while current_date <= end_date:
+            month_year = current_date.strftime('%b %Y')
+            date_counts[month_year] = 0
+            current_date += timedelta(days=30)  # approximate month
+        
+        # Count products by month
+        for product in products:
+            if start_date <= product['creation_date'] <= end_date:
+                month_year = product['creation_date'].strftime('%b %Y')
+                date_counts[month_year] += 1
+        
+        # Sort dates chronologically
+        sorted_dates = sorted(date_counts.keys(), 
+                            key=lambda d: datetime.strptime(d, '%b %Y'))
+        product_counts = [date_counts[date] for date in sorted_dates]
 
-        # Pie chart for category totals
-        axs[1].pie(quantities_by_category, labels=categories, autopct='%1.1f%%', startangle=90)
-        axs[1].axis('equal')
-        axs[1].set_title('Inventory Distribution by Category')
+        # Simulate sales data (since we don't have actual sales data in the system)
+        # In a real application, this would come from a sales database
+        sales_data = defaultdict(int)
+        
+        # Generate some sample sales data for demonstration
+        import random
+        for date in sorted_dates:
+            # Generate a random number of sales that somewhat correlates with product counts
+            # but with some variation
+            corresponding_count = date_counts[date]
+            if corresponding_count > 0:
+                # Simulate that approximately 60-90% of added products were sold
+                sales_data[date] = int(corresponding_count * (0.6 + random.random() * 0.3))
+            else:
+                sales_data[date] = 0
+        
+        sales_counts = [sales_data[date] for date in sorted_dates]
 
-        # Embed the figure into Tkinter
-        canvas = FigureCanvasTkAgg(fig, master=self.content_area)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
+        # Create each chart in its own card frame with more spacing
+        # Chart 1: Products Added Over Time
+        chart1_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart1_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart1_frame, 
+                text="Products Added Over Time", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        fig1, ax1 = plt.subplots(figsize=(10, 5))
+        ax1.plot(sorted_dates, product_counts, marker='o', linestyle='-', color='royalblue', linewidth=2)
+        ax1.set_xlabel('Month')
+        ax1.set_ylabel('Number of Products Added')
+        ax1.tick_params(axis='x', rotation=45)
+        ax1.grid(True, linestyle='--', alpha=0.7)
+        ax1.set_ylim(bottom=0)
+        
+        # Add data labels to the line points
+        for i, count in enumerate(product_counts):
+            ax1.annotate(str(count), 
+                        (sorted_dates[i], product_counts[i]),
+                        textcoords="offset points", 
+                        xytext=(0,5), 
+                        ha='center')
+        
+        fig1.tight_layout()
+        canvas1 = FigureCanvasTkAgg(fig1, master=chart1_frame)
+        canvas1.draw()
+        canvas1.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Chart 2: Products Sold Over Time
+        chart2_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart2_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart2_frame, 
+                text="Products Sold Over Time", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        bars = ax2.bar(sorted_dates, sales_counts, color='forestgreen')
+        ax2.set_xlabel('Month')
+        ax2.set_ylabel('Number of Products Sold')
+        ax2.tick_params(axis='x', rotation=45)
+        ax2.grid(True, linestyle='--', alpha=0.7, axis='y')
+        
+        # Add data labels on top of each bar
+        for bar in bars:
+            height = bar.get_height()
+            ax2.annotate(f'{height}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+        
+        fig2.tight_layout()
+        canvas2 = FigureCanvasTkAgg(fig2, master=chart2_frame)
+        canvas2.draw()
+        canvas2.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Chart 3: Inventory Distribution by Category
+        chart3_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart3_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart3_frame, 
+                text="Inventory Distribution by Category", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        fig3, ax3 = plt.subplots(figsize=(10, 7))
+        ax3.pie(quantities_by_category, labels=categories, autopct='%1.1f%%', startangle=90,
+                shadow=True, explode=[0.05]*len(categories))
+        ax3.axis('equal')
+        
+        fig3.tight_layout()
+        canvas3 = FigureCanvasTkAgg(fig3, master=chart3_frame)
+        canvas3.draw()
+        canvas3.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Add explanatory text
+        explanation_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        explanation_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(explanation_frame,
+                text="About These Charts",
+                font=self.fonts['header']).pack(pady=10)
+        
+        explanations = [
+            "• The line graph shows the number of products added each month over the past 6 months.",
+            "• The bar graph shows the estimated number of products sold each month over the same period.",
+            "• The pie chart displays the current distribution of inventory across product categories."
+        ]
+        
+        for explanation in explanations:
+            ttk.Label(explanation_frame,
+                    text=explanation,
+                    font=self.fonts['normal'],
+                    wraplength=800).pack(anchor='w', pady=5, padx=20)
+        
+        # Add a note about sample data
+        ttk.Label(explanation_frame,
+                text="Note: Sales data is simulated for demonstration purposes. In a production environment, this would be based on actual sales records.",
+                font=self.fonts['small'],
+                foreground='gray',
+                wraplength=800).pack(anchor='w', pady=10, padx=20)
+        
+        # Pack the canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Make sure scrolling works with mousewheel
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
     def run(self):
         self.root.mainloop()
