@@ -6,13 +6,14 @@ import tkinter.font as tkfont
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from collections import defaultdict
-
+from PIL import Image, ImageTk
 
 class InventoryUI:
     def __init__(self, auth_system, inventory_manager):
         self.auth_system = auth_system
         self.inventory_manager = inventory_manager
-        
+        # self.style = ttk.Style()
+
         # Create main window
         self.root = tk.Tk()
         self.root.title("Inventory Management System")
@@ -41,86 +42,226 @@ class InventoryUI:
         
         # Configure styles
         self.setup_styles()
-        
-        # Show login screen
-        self.show_login_screen()
+
+        # Show home page
+        self.show_homepage()
 
     def setup_styles(self):
         style = ttk.Style()
         style.configure('Main.TFrame', background=self.colors['bg'])
         style.configure('Card.TFrame', background=self.colors['white'])
-        
+
         # Button styles
         style.configure('Primary.TButton',
                        background=self.colors['primary'],
                        foreground=self.colors['white'],
                        padding=10,
                        font=self.fonts['normal'])
-        
+
         style.configure('Success.TButton',
                        background=self.colors['success'],
                        foreground=self.colors['white'],
                        padding=10,
                        font=self.fonts['normal'])
-        
+
         style.configure('Warning.TButton',
                        background=self.colors['warning'],
                        foreground=self.colors['dark'],
                        padding=10,
                        font=self.fonts['normal'])
-        
+
         style.configure('Danger.TButton',
                        background=self.colors['danger'],
                        foreground=self.colors['white'],
                        padding=10,
                        font=self.fonts['normal'])
 
+    def show_homepage(self):
+        # Clear window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Load background image 1300x800
+        self.background_image = Image.open("./resources/storageBgCartoon.jpg")
+        self.background_image = self.background_image.resize((1300, 800))
+        self.bg_photo = ImageTk.PhotoImage(self.background_image)
+
+        # Create canvas to display background
+        self.canvas = tk.Canvas(self.root, width=1300, height=800)
+        self.canvas.pack(fill="both", expand=True)
+        self.canvas.create_image(0, 0, image=self.bg_photo, anchor="nw")
+
+        # Center coordinates
+        center_x = 1300 // 2
+
+        # Short description (centered)
+        self.canvas.create_text(center_x+2, 150+2,
+                                text="Welcome to Inventory Management System",
+                                font=('Helvetica', 35, 'bold'),
+                                fill="black")
+        self.canvas.create_text(center_x, 150,
+                                text="Welcome to Inventory Management System",
+                                font=('Helvetica', 35, 'bold'),
+                                fill="white")
+
+        # Buttons
+        login_button = ttk.Button(self.root, text="Login", command=self.show_login_screen)
+        signup_button = ttk.Button(self.root, text="Signup", command=self.show_register_screen)
+
+        # Place buttons on the canvas (centered below the text)
+        self.canvas.create_window(center_x - 60, 300, window=login_button, width=100, height=40)
+        self.canvas.create_window(center_x + 60, 300, window=signup_button, width=100, height=40)
+
+        description = ("Effortless Storage Management. Maximum Efficiency. "
+                       "Easily track, organize, and manage all types of storage"
+                       " — from closets to warehouses. Quickly find items, keep "
+                       "inventory updated, and maintain an organized system. "
+                       "Start optimizing space today!")
+
+        self.canvas.create_text(center_x + 1, 600 + 1,
+                                width=1000,
+                                anchor='center',
+                                text=description,
+                                font=('Helvetica', 18, 'bold'),
+                                fill="black")
+        self.canvas.create_text(center_x, 600,
+                                width=1000,
+                                anchor='center',
+                                text=description,
+                                font=('Helvetica', 18, 'bold'),
+                                fill="white")
+
+
     def show_login_screen(self):
         # Clear window
         for widget in self.root.winfo_children():
             widget.destroy()
-        
+
         # Create main frame
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-        
+
         # Title
-        title_label = ttk.Label(main_frame, 
-                               text="Inventory Management System",
-                               font=('Helvetica', 24, 'bold'))
+        title_label = ttk.Label(main_frame,
+                                text="Login",
+                                font=('Helvetica', 24, 'bold'))
         title_label.pack(pady=20)
-        
+
         # Login form
         form_frame = ttk.Frame(main_frame)
         form_frame.pack(pady=20)
-        
+
         # Username
         ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
         self.username_var = tk.StringVar()
         username_entry = ttk.Entry(form_frame, textvariable=self.username_var, width=30)
         username_entry.pack(pady=5)
-        
+
         # Password
         ttk.Label(form_frame, text="Password:", font=('Helvetica', 12)).pack()
         self.password_var = tk.StringVar()
         password_entry = ttk.Entry(form_frame, textvariable=self.password_var, show="•", width=30)
         password_entry.pack(pady=5)
-        
+
         # Buttons
         button_frame = ttk.Frame(form_frame)
         button_frame.pack(pady=20)
-        
-        ttk.Button(button_frame,
-                  text="Login",
-                  command=self.handle_login).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(button_frame,
-                  text="Register",
-                  command=self.show_register_screen).pack(side=tk.LEFT, padx=5)
 
-        ttk.Button(button_frame,
-                   text="Forget Password",
-                   command=self.show_forget_pass_screen).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Login", command=self.handle_login).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Back", command=self.show_homepage).pack(side=tk.LEFT, padx=5)
+
+    def show_register_screen(self):
+        # Clear window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Create main frame
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # Title
+        title_label = ttk.Label(main_frame,
+                                text="Register",
+                                font=('Helvetica', 24, 'bold'))
+        title_label.pack(pady=20)
+
+        # Register form
+        form_frame = ttk.Frame(main_frame)
+        form_frame.pack(pady=20)
+
+        # Username
+        ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
+        self.reg_username_var = tk.StringVar()
+        username_entry = ttk.Entry(form_frame, textvariable=self.reg_username_var, width=30)
+        username_entry.pack(pady=5)
+
+        # Password
+        ttk.Label(form_frame, text="Password:", font=('Helvetica', 12)).pack()
+        self.reg_password_var = tk.StringVar()
+        password_entry = ttk.Entry(form_frame, textvariable=self.reg_password_var, show="•", width=30)
+        password_entry.pack(pady=5)
+
+        # Confirm Password
+        ttk.Label(form_frame, text="Confirm Password:", font=('Helvetica', 12)).pack()
+        self.confirm_password_var = tk.StringVar()
+        confirm_password_entry = ttk.Entry(form_frame, textvariable=self.confirm_password_var, show="•", width=30)
+        confirm_password_entry.pack(pady=5)
+
+        # Buttons
+        button_frame = ttk.Frame(form_frame)
+        button_frame.pack(pady=20)
+
+        ttk.Button(button_frame, text="Register", command=self.handle_register).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Back", command=self.show_homepage).pack(side=tk.LEFT, padx=5)
+
+
+
+    # def show_login_screen(self):
+    #     # Clear window
+    #     for widget in self.root.winfo_children():
+    #         widget.destroy()
+    #
+    #     # Create main frame
+    #     main_frame = ttk.Frame(self.root)
+    #     main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+    #
+    #     # Title
+    #     title_label = ttk.Label(main_frame,
+    #                            text="Inventory Management System",
+    #                            font=('Helvetica', 24, 'bold'))
+    #     title_label.pack(pady=20)
+    #
+    #     # Login form
+    #     form_frame = ttk.Frame(main_frame)
+    #     form_frame.pack(pady=20)
+    #
+    #     # Username
+    #     ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
+    #     self.username_var = tk.StringVar()
+    #     username_entry = ttk.Entry(form_frame, textvariable=self.username_var, width=30)
+    #     username_entry.pack(pady=5)
+    #
+    #     # Password
+    #     ttk.Label(form_frame, text="Password:", font=('Helvetica', 12)).pack()
+    #     self.password_var = tk.StringVar()
+    #     password_entry = ttk.Entry(form_frame, textvariable=self.password_var, show="•", width=30)
+    #     password_entry.pack(pady=5)
+    #
+    #     # Buttons
+    #     button_frame = ttk.Frame(form_frame)
+    #     button_frame.pack(pady=20)
+    #
+    #     ttk.Button(button_frame,
+    #               text="Login",
+    #               command=self.handle_login).pack(side=tk.LEFT, padx=5)
+    #
+    #     ttk.Button(button_frame,
+    #               text="Register",
+    #               command=self.show_register_screen).pack(side=tk.LEFT, padx=5)
+    #
+    #     ttk.Button(button_frame,
+    #                text="Forget Password",
+    #                command=self.show_forget_pass_screen).pack(side=tk.LEFT, padx=5)
 
     def show_main_screen(self):
         # Clear window
@@ -875,48 +1016,6 @@ class InventoryUI:
         self.auth_system.logout()
         self.show_login_screen()
 
-    def show_register_screen(self):
-        # Clear window
-        for widget in self.root.winfo_children():
-            widget.destroy()
-        
-        # Create main frame
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-        
-        # Title
-        title_label = ttk.Label(main_frame,
-                               text="Create New Account",
-                               font=('Helvetica', 24, 'bold'))
-        title_label.pack(pady=20)
-        
-        # Form
-        form_frame = ttk.Frame(main_frame)
-        form_frame.pack(pady=20)
-        
-        # Username
-        ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
-        self.reg_username_var = tk.StringVar()
-        username_entry = ttk.Entry(form_frame, textvariable=self.reg_username_var, width=30)
-        username_entry.pack(pady=5)
-        
-        # Password
-        ttk.Label(form_frame, text="Password:", font=('Helvetica', 12)).pack()
-        self.reg_password_var = tk.StringVar()
-        password_entry = ttk.Entry(form_frame, textvariable=self.reg_password_var, show="•", width=30)
-        password_entry.pack(pady=5)
-        
-        # Buttons
-        button_frame = ttk.Frame(form_frame)
-        button_frame.pack(pady=20)
-        
-        ttk.Button(button_frame,
-                  text="Register",
-                  command=self.handle_register).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Button(button_frame,
-                  text="Back to Login",
-                  command=self.show_login_screen).pack(side=tk.LEFT, padx=5)
 
     def handle_register(self):
         username = self.reg_username_var.get()
@@ -931,85 +1030,6 @@ class InventoryUI:
             self.show_login_screen()
         else:
             messagebox.showerror("Error", "Username already exists")
-
-    def handle_forget_pass(self):
-        userid = self.for_id_var.get()
-        username = self.for_username_var.get()
-        role = self.for_role_var.get()
-        new_password1 = self.new_for_password1_var.get()
-        new_password2 = self.new_for_password2_var.get()
-
-        if not (userid and username and role and new_password1 and new_password2):
-            messagebox.showerror("Error", "Please fill in all fields")
-            return
-
-        # print("change", self.auth_system.forget_password(userid, username, role, new_password))
-        if new_password1 == new_password2 and self.auth_system.forget_password(userid, username, role, new_password1):
-            messagebox.showinfo("Success", "Password change successful! Please login.")
-            self.show_login_screen()
-        else:
-            messagebox.showerror("Error", "Invalid info.")
-
-    def show_forget_pass_screen(self):
-        # Clear window
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        # Create main frame
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-        # Title
-        title_label = ttk.Label(main_frame,
-                                text="Forget Password",
-                                font=('Helvetica', 24, 'bold'))
-        title_label.pack(pady=20)
-
-        # Form
-        form_frame = ttk.Frame(main_frame)
-        form_frame.pack(pady=20)
-
-        #ID
-        ttk.Label(form_frame, text="ID:", font=('Helvetica', 12)).pack()
-        self.for_id_var = tk.StringVar()
-        username_entry = ttk.Entry(form_frame, textvariable=self.for_id_var, width=30)
-        username_entry.pack(pady=5)
-
-        # Username
-        ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
-        self.for_username_var = tk.StringVar()
-        username_entry = ttk.Entry(form_frame, textvariable=self.for_username_var, width=30)
-        username_entry.pack(pady=5)
-
-        # Role
-        ttk.Label(form_frame, text="Role:", font=('Helvetica', 12)).pack()
-        self.for_role_var = tk.StringVar()
-        password_entry = ttk.Entry(form_frame, textvariable=self.for_role_var, width=30)
-        password_entry.pack(pady=5)
-
-        # New Password1
-        ttk.Label(form_frame, text="New Password:", font=('Helvetica', 12)).pack()
-        self.new_for_password1_var = tk.StringVar()
-        password_entry = ttk.Entry(form_frame, textvariable=self.new_for_password1_var, show="•", width=30)
-        password_entry.pack(pady=5)
-
-        # New Password2
-        ttk.Label(form_frame, text="New Password:", font=('Helvetica', 12)).pack()
-        self.new_for_password2_var = tk.StringVar()
-        password_entry = ttk.Entry(form_frame, textvariable=self.new_for_password2_var, show="•", width=30)
-        password_entry.pack(pady=5)
-
-        # Buttons
-        button_frame = ttk.Frame(form_frame)
-        button_frame.pack(pady=20)
-
-        ttk.Button(button_frame,
-                   text="Change",
-                   command=self.handle_forget_pass).pack(side=tk.LEFT, padx=5)
-
-        ttk.Button(button_frame,
-                   text="Back to Login",
-                   command=self.show_login_screen).pack(side=tk.LEFT, padx=5)
 
     def show_statistic(self):
         # Clear content area
