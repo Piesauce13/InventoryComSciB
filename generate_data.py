@@ -14,8 +14,8 @@ def generate_sample_data():
     inventory_manager = InventoryManager(db)
     
     # Create admin and regular user if they don't exist
-    auth_system.register("admin", "admin123", "admin")
-    auth_system.register("user", "password", "regular")
+    auth_system.register("admin", "admin123", "admin", "admin")
+    auth_system.register("user", "password", "regular", "regular")
     
     # Product categories
     categories = [
