@@ -23,22 +23,21 @@ class Database:
         """Create necessary tables if they don't exist"""
         cursor = self.conn.cursor()
         
-        # Create users table
+        # Create users table if it doesn't exist
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('admin', 'regular'))
+            role TEXT NOT NULL CHECK (role IN ('admin', 'regular')),
+            security_question TEXT NOT NULL,
+            security_answer TEXT NOT NULL
         )
         ''')
         
-        # Drop existing products table if it exists
-        cursor.execute('DROP TABLE IF EXISTS products')
-        
-        # Create products table with new schema
+        # Create products table if it doesn't exist
         cursor.execute('''
-        CREATE TABLE products (
+        CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
@@ -53,12 +52,21 @@ class Database:
         )
         ''')
         
-        # Create indexes for optimization
+        # Create indexes for optimization if they don't exist
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_products_category ON products(category)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_products_expiry ON products(expiry_date)')
         
         self.conn.commit()
+
+    def clear_products_for_new_user(self):
+        """Clear all products for a new user"""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('DELETE FROM products')
+            self.conn.commit()
+        finally:
+            cursor.close()
     
     def close(self):
         """Close the database connection"""

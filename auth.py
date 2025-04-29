@@ -56,11 +56,12 @@ class AuthSystem:
         finally:
             cursor.close()
 
-    def __insert_user_to_db(self, username, password, role):
+    def __insert_user_to_db(self, username, password, role, security_question, security_answer):
         cursor = self.db.conn.cursor()
         try:
-            cursor.execute("""INSERT OR IGNORE INTO users (username, password_hash, role)
-                                    VALUES(?, ?, ?)""", (username, password, role))
+            cursor.execute("""INSERT OR IGNORE INTO users (username, password_hash, role, security_question, security_answer)
+                                    VALUES(?, ?, ?, ?, ?)""", 
+                                    (username, password, role, security_question, security_answer))
             self.db.conn.commit()
         finally:
             cursor.close()
@@ -75,7 +76,7 @@ class AuthSystem:
 
 
     # methods for auth and personal info
-    def register(self, username, password, role = 'regular'):
+    def register(self, username, password, security_question, security_answer, role = 'regular'):
         hash_password = self.__hash_password(password)
         role = role if role in ["admin", "regular"] else "regular"
 
@@ -83,7 +84,10 @@ class AuthSystem:
         usernames_list = [user[0] for user in usernames_list] #convert from 2d to 1d
 
         if username not in usernames_list:
-            self.__insert_user_to_db(username, hash_password, role)
+            # Clear products for new user
+            self.db.clear_products_for_new_user()
+            # Register the new user
+            self.__insert_user_to_db(username, hash_password, role, security_question, security_answer)
             return True
         return False
 
@@ -115,6 +119,7 @@ class AuthSystem:
             new_hash_pass = self.__hash_password(new_pass)
             self.__update_user_in_db("password_hash", new_hash_pass,
                                      "username", username)
+            return True
         return False
 
     def update_username(self, old_username, new_username, password):
@@ -154,3 +159,31 @@ class AuthSystem:
             for j in i:
                 print(j, end=" ")
             print()
+
+    def get_security_question(self, username):
+        cursor = self.db.conn.cursor()
+        try:
+            cursor.execute("SELECT security_question FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+        finally:
+            cursor.close()
+
+    def reset_password(self, username, security_answer, new_password):
+        cursor = self.db.conn.cursor()
+        try:
+            # First verify the security answer
+            cursor.execute("SELECT security_answer FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone()
+            
+            if not result or result[0] != security_answer:
+                return False
+            
+            # If security answer is correct, update the password
+            new_hash_password = self.__hash_password(new_password)
+            cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?", 
+                         (new_hash_password, username))
+            self.db.conn.commit()
+            return True
+        finally:
+            cursor.close()

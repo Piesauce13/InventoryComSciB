@@ -345,7 +345,7 @@ class InventoryUI:
                  font=('Helvetica', 20, 'bold')).pack(pady=10)
         
         # Create table
-        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity')
+        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity', 'Expiry Date', 'Manufacture Date', 'Notes')
         tree = ttk.Treeview(self.content_area, columns=columns, show='headings')
         
         # Configure columns
@@ -369,7 +369,10 @@ class InventoryUI:
                 product['name'],
                 product['category'],
                 f"${product['price']:.2f}",
-                product['quantity']
+                product['quantity'],
+                product['expiry_date'] if product['expiry_date'] else 'N/A',
+                product['mfg_date'] if product['mfg_date'] else 'N/A',
+                product['notes'] if product['notes'] else 'N/A'
             ))
 
     def show_add_product(self):
@@ -484,8 +487,15 @@ class InventoryUI:
                                      maxdate=datetime.now())  # Can't be future date
         fields['mfg_date'].grid(row=0, column=1, padx=5, pady=5)
         
+        # Has Expiry Date Checkbox
+        has_expiry_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(dates_info, 
+                       text="Product has expiry date",
+                       variable=has_expiry_var,
+                       command=lambda: fields['expiry_date'].configure(state='normal' if has_expiry_var.get() else 'disabled')).grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+        
         # Expiry Date
-        ttk.Label(dates_info, text="Expiry Date:").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(dates_info, text="Expiry Date:").grid(row=2, column=0, padx=5, pady=5)
         fields['expiry_date'] = DateEntry(dates_info, 
                                         width=20, 
                                         background=self.colors['primary'],
@@ -493,41 +503,21 @@ class InventoryUI:
                                         borderwidth=2,
                                         date_pattern='yyyy-mm-dd',
                                         mindate=datetime.now())  # Must be future date
-        fields['expiry_date'].grid(row=1, column=1, padx=5, pady=5)
+        fields['expiry_date'].grid(row=2, column=1, padx=5, pady=5)
         
-        # Add date validation
-        def validate_dates(*args):
-            try:
-                mfg_date = fields['mfg_date'].get_date()
-                exp_date = fields['expiry_date'].get_date()
-                
-                if mfg_date > datetime.now().date():
-                    messagebox.showerror("Error", "Manufacturing date cannot be in the future")
-                    fields['mfg_date'].set_date(datetime.now())
-                    return False
-                
-                if exp_date <= mfg_date:
-                    messagebox.showerror("Error", "Expiry date must be after manufacturing date")
-                    fields['expiry_date'].set_date(mfg_date + timedelta(days=1))
-                    return False
-                
-                return True
-            except Exception as e:
-                messagebox.showerror("Error", f"Invalid date format: {str(e)}")
-                return False
-
-        # Bind validation to date changes
-        fields['mfg_date'].bind("<<DateEntrySelected>>", validate_dates)
-        fields['expiry_date'].bind("<<DateEntrySelected>>", validate_dates)
+        # Notes Section
+        notes_info = ttk.LabelFrame(form_frame, text="Notes", padding=10)
+        notes_info.pack(fill=tk.X, padx=10, pady=5)
         
-        # Additional Information Section
-        additional_info = ttk.LabelFrame(form_frame, text="Additional Information", padding=10)
-        additional_info.pack(fill=tk.X, padx=10, pady=5)
-        
-        # Notes
-        ttk.Label(additional_info, text="Notes:").pack(anchor='w', padx=5, pady=5)
-        fields['notes'] = tk.Text(additional_info, height=4, width=50)
+        # Notes Text Area
+        fields['notes'] = tk.Text(notes_info, height=4, width=50)
         fields['notes'].pack(padx=5, pady=5, fill=tk.X)
+        
+        def validate_dates():
+            if has_expiry_var.get() and not fields['expiry_date'].get():
+                messagebox.showerror("Error", "Please select an expiry date")
+                return False
+            return True
         
         def save_product():
             try:
@@ -549,7 +539,7 @@ class InventoryUI:
                     'quantity': int(fields['quantity'].get()),
                     'min_stock_level': int(fields['min_stock'].get()),
                     'mfg_date': fields['mfg_date'].get_date().strftime('%Y-%m-%d'),
-                    'expiry_date': fields['expiry_date'].get_date().strftime('%Y-%m-%d'),
+                    'expiry_date': fields['expiry_date'].get_date().strftime('%Y-%m-%d') if has_expiry_var.get() else None,
                     'notes': fields['notes'].get("1.0", tk.END).strip()
                 }
                 
@@ -781,7 +771,7 @@ class InventoryUI:
                  font=('Helvetica', 20, 'bold')).pack(pady=10)
         
         # Create table
-        columns = ('ID', 'Name', 'Category', 'Expiry Date')
+        columns = ('ID', 'Name', 'Category', 'Quantity', 'Expiry Date', 'Manufacture Date', 'Notes')
         tree = ttk.Treeview(self.content_area, columns=columns, show='headings')
         
         for col in columns:
@@ -801,7 +791,10 @@ class InventoryUI:
                 product['id'],
                 product['name'],
                 product['category'],
-                product['expiry_date']
+                product['quantity'],
+                product['expiry_date'],
+                product['mfg_date'] if product['mfg_date'] else 'N/A',
+                product['notes'] if product['notes'] else 'N/A'
             ))
 
     def show_sort_products(self):
@@ -858,65 +851,139 @@ class InventoryUI:
                  text="Update Product",
                  font=('Helvetica', 20, 'bold')).pack(pady=10)
         
-        # Product selection frame
-        select_frame = ttk.Frame(self.content_area)
-        select_frame.pack(fill=tk.X, padx=20, pady=10)
+        # Search frame
+        search_frame = ttk.Frame(self.content_area)
+        search_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        ttk.Label(select_frame, text="Product ID:").pack(side=tk.LEFT, padx=5)
-        id_var = tk.StringVar()
-        id_entry = ttk.Entry(select_frame, textvariable=id_var, width=10)
-        id_entry.pack(side=tk.LEFT, padx=5)
+        # Search type dropdown
+        ttk.Label(search_frame, text="Search by:").pack(side=tk.LEFT, padx=5)
+        search_type_var = tk.StringVar(value="id")
+        search_type_combo = ttk.Combobox(search_frame, 
+                                       textvariable=search_type_var,
+                                       values=["id", "name", "category", "notes"],
+                                       state="readonly",
+                                       width=10)
+        search_type_combo.pack(side=tk.LEFT, padx=5)
         
-        def load_product():
-            try:
-                product_id = int(id_var.get())
-                product = self.inventory_manager.get_product_by_id(product_id)
-                if product:
-                    show_update_form(product)
-                else:
-                    messagebox.showerror("Error", "Product not found")
-            except ValueError:
-                messagebox.showerror("Error", "Please enter a valid product ID")
+        # Search entry
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=search_var, width=30)
+        search_entry.pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(select_frame,
-                  text="Load Product",
-                  command=load_product).pack(side=tk.LEFT, padx=5)
+        # Results frame
+        results_frame = ttk.Frame(self.content_area)
+        results_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # Update form container
-        self.update_form_frame = ttk.Frame(self.content_area)
-        self.update_form_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        # Create table for results
+        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity', 'Notes')
+        tree = ttk.Treeview(results_frame, columns=columns, show='headings')
         
-        def show_update_form(product):
-            # Clear previous form
-            for widget in self.update_form_frame.winfo_children():
-                widget.destroy()
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=100)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        def perform_search():
+            # Clear previous results
+            for item in tree.get_children():
+                tree.delete(item)
             
-            # Create form fields
+            search_type = search_type_var.get()
+            search_term = search_var.get()
+            
+            if not search_term:
+                messagebox.showwarning("Warning", "Please enter a search term")
+                return
+            
+            # Get products based on search type
+            if search_type == "id":
+                try:
+                    product_id = int(search_term)
+                    product = self.inventory_manager.get_product_by_id(product_id)
+                    if product:
+                        products = [product]
+                    else:
+                        products = []
+                except ValueError:
+                    messagebox.showerror("Error", "Please enter a valid ID number")
+                    return
+            else:
+                products = self.inventory_manager.search_products(search_term)
+                # Filter by the selected field
+                if search_type != "name":  # name is already handled by search_products
+                    products = [p for p in products if search_term.lower() in str(p[search_type]).lower()]
+            
+            if not products:
+                messagebox.showinfo("Info", "No products found matching your search")
+                return
+            
+            # Display results
+            for product in products:
+                tree.insert('', 'end', values=(
+                    product['id'],
+                    product['name'],
+                    product['category'],
+                    f"${product['price']:.2f}",
+                    product['quantity'],
+                    product['notes'] if product['notes'] else 'N/A'
+                ))
+        
+        def show_update_form():
+            selected_item = tree.selection()
+            if not selected_item:
+                messagebox.showwarning("Warning", "Please select a product to update")
+                return
+            
+            product_id = tree.item(selected_item[0])['values'][0]
+            product = self.inventory_manager.get_product_by_id(product_id)
+            
+            if not product:
+                messagebox.showerror("Error", "Product not found")
+                return
+            
+            # Create update form
+            form_frame = ttk.Frame(self.content_area)
+            form_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+            
+            # Form fields
             fields = {}
             
             # Name
-            ttk.Label(self.update_form_frame, text="Name:").pack(anchor='w')
-            fields['name'] = ttk.Entry(self.update_form_frame, width=30)
+            ttk.Label(form_frame, text="Name:").grid(row=0, column=0, padx=5, pady=5)
+            fields['name'] = ttk.Entry(form_frame, width=30)
             fields['name'].insert(0, product['name'])
-            fields['name'].pack(pady=5)
+            fields['name'].grid(row=0, column=1, padx=5, pady=5)
             
             # Category
-            ttk.Label(self.update_form_frame, text="Category:").pack(anchor='w')
-            fields['category'] = ttk.Entry(self.update_form_frame, width=30)
+            ttk.Label(form_frame, text="Category:").grid(row=1, column=0, padx=5, pady=5)
+            fields['category'] = ttk.Entry(form_frame, width=30)
             fields['category'].insert(0, product['category'])
-            fields['category'].pack(pady=5)
+            fields['category'].grid(row=1, column=1, padx=5, pady=5)
             
             # Price
-            ttk.Label(self.update_form_frame, text="Price:").pack(anchor='w')
-            fields['price'] = ttk.Entry(self.update_form_frame, width=30)
+            ttk.Label(form_frame, text="Price:").grid(row=2, column=0, padx=5, pady=5)
+            fields['price'] = ttk.Entry(form_frame, width=30)
             fields['price'].insert(0, str(product['price']))
-            fields['price'].pack(pady=5)
+            fields['price'].grid(row=2, column=1, padx=5, pady=5)
             
             # Quantity
-            ttk.Label(self.update_form_frame, text="Quantity:").pack(anchor='w')
-            fields['quantity'] = ttk.Entry(self.update_form_frame, width=30)
+            ttk.Label(form_frame, text="Quantity:").grid(row=3, column=0, padx=5, pady=5)
+            fields['quantity'] = ttk.Entry(form_frame, width=30)
             fields['quantity'].insert(0, str(product['quantity']))
-            fields['quantity'].pack(pady=5)
+            fields['quantity'].grid(row=3, column=1, padx=5, pady=5)
+            
+            # Notes
+            ttk.Label(form_frame, text="Notes:").grid(row=4, column=0, padx=5, pady=5)
+            fields['notes'] = tk.Text(form_frame, width=30, height=3)
+            fields['notes'].insert('1.0', product['notes'] if product['notes'] else '')
+            fields['notes'].grid(row=4, column=1, padx=5, pady=5)
             
             def update_product():
                 try:
@@ -924,21 +991,33 @@ class InventoryUI:
                         'name': fields['name'].get(),
                         'category': fields['category'].get(),
                         'price': float(fields['price'].get()),
-                        'quantity': int(fields['quantity'].get())
+                        'quantity': int(fields['quantity'].get()),
+                        'notes': fields['notes'].get('1.0', tk.END).strip()
                     }
                     
-                    success, message = self.inventory_manager.update_product(product['id'], **updates)
+                    success, message = self.inventory_manager.update_product(product_id, **updates)
                     if success:
                         messagebox.showinfo("Success", "Product updated successfully!")
-                        self.show_products()
+                        perform_search()  # Refresh the results
                     else:
                         messagebox.showerror("Error", message)
                 except ValueError:
                     messagebox.showerror("Error", "Please enter valid numbers for price and quantity")
             
-            ttk.Button(self.update_form_frame,
+            # Update button
+            ttk.Button(form_frame,
                       text="Update Product",
-                      command=update_product).pack(pady=20)
+                      command=update_product).grid(row=5, column=0, columnspan=2, pady=10)
+        
+        # Search button
+        ttk.Button(search_frame,
+                  text="Search",
+                  command=perform_search).pack(side=tk.LEFT, padx=5)
+        
+        # Update button
+        ttk.Button(results_frame,
+                  text="Update Selected",
+                  command=show_update_form).pack(pady=10)
 
     def show_delete_product(self):
         # Clear content area
@@ -949,31 +1028,117 @@ class InventoryUI:
                  text="Delete Product",
                  font=('Helvetica', 20, 'bold')).pack(pady=10)
         
-        # Delete frame
-        delete_frame = ttk.Frame(self.content_area)
-        delete_frame.pack(fill=tk.X, padx=20, pady=10)
+        # Search frame
+        search_frame = ttk.Frame(self.content_area)
+        search_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        ttk.Label(delete_frame, text="Product ID:").pack(side=tk.LEFT, padx=5)
-        id_var = tk.StringVar()
-        id_entry = ttk.Entry(delete_frame, textvariable=id_var, width=10)
-        id_entry.pack(side=tk.LEFT, padx=5)
+        # Search type dropdown
+        ttk.Label(search_frame, text="Search by:").pack(side=tk.LEFT, padx=5)
+        search_type_var = tk.StringVar(value="id")
+        search_type_combo = ttk.Combobox(search_frame, 
+                                       textvariable=search_type_var,
+                                       values=["id", "name", "category", "notes"],
+                                       state="readonly",
+                                       width=10)
+        search_type_combo.pack(side=tk.LEFT, padx=5)
         
-        def delete_product():
-            try:
-                product_id = int(id_var.get())
-                if messagebox.askyesno("Confirm", "Are you sure you want to delete this product?"):
-                    success, message = self.inventory_manager.delete_product(product_id)
-                    if success:
-                        messagebox.showinfo("Success", "Product deleted successfully!")
-                        self.show_products()
+        # Search entry
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=search_var, width=30)
+        search_entry.pack(side=tk.LEFT, padx=5)
+        
+        # Results frame
+        results_frame = ttk.Frame(self.content_area)
+        results_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # Create table for results
+        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity', 'Notes')
+        tree = ttk.Treeview(results_frame, columns=columns, show='headings')
+        
+        # Configure columns
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=100)
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(results_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        def perform_search():
+            # Clear previous results
+            for item in tree.get_children():
+                tree.delete(item)
+            
+            search_type = search_type_var.get()
+            search_term = search_var.get()
+            
+            if not search_term:
+                messagebox.showwarning("Warning", "Please enter a search term")
+                return
+            
+            # Get products based on search type
+            if search_type == "id":
+                try:
+                    product_id = int(search_term)
+                    product = self.inventory_manager.get_product_by_id(product_id)
+                    if product:
+                        products = [product]
                     else:
-                        messagebox.showerror("Error", message)
-            except ValueError:
-                messagebox.showerror("Error", "Please enter a valid product ID")
+                        products = []
+                except ValueError:
+                    messagebox.showerror("Error", "Please enter a valid ID number")
+                    return
+            else:
+                products = self.inventory_manager.search_products(search_term)
+                # Filter by the selected field
+                if search_type != "name":  # name is already handled by search_products
+                    products = [p for p in products if search_term.lower() in str(p[search_type]).lower()]
+            
+            if not products:
+                messagebox.showinfo("Info", "No products found matching your search")
+                return
+            
+            # Display results
+            for product in products:
+                tree.insert('', 'end', values=(
+                    product['id'],
+                    product['name'],
+                    product['category'],
+                    f"${product['price']:.2f}",
+                    product['quantity'],
+                    product['notes'] if product['notes'] else 'N/A'
+                ))
         
-        ttk.Button(delete_frame,
-                  text="Delete Product",
-                  command=delete_product).pack(side=tk.LEFT, padx=5)
+        def delete_selected():
+            selected_item = tree.selection()
+            if not selected_item:
+                messagebox.showwarning("Warning", "Please select a product to delete")
+                return
+            
+            product_id = tree.item(selected_item[0])['values'][0]
+            product_name = tree.item(selected_item[0])['values'][1]
+            
+            if messagebox.askyesno("Confirm Delete", 
+                                 f"Are you sure you want to delete '{product_name}'?"):
+                success, message = self.inventory_manager.delete_product(product_id)
+                if success:
+                    messagebox.showinfo("Success", "Product deleted successfully!")
+                    perform_search()  # Refresh the results
+                else:
+                    messagebox.showerror("Error", message)
+        
+        # Search button
+        ttk.Button(search_frame,
+                  text="Search",
+                  command=perform_search).pack(side=tk.LEFT, padx=5)
+        
+        # Delete button
+        ttk.Button(results_frame,
+                  text="Delete Selected",
+                  command=delete_selected).pack(pady=10)
 
     def display_products(self, products):
         # Clear results frame
@@ -1016,43 +1181,281 @@ class InventoryUI:
         self.auth_system.logout()
         self.show_login_screen()
 
+<<<<<<< HEAD
+=======
+    def show_register_screen(self):
+        # Clear window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Create main frame
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ttk.Label(main_frame,
+                               text="Create New Account",
+                               font=('Helvetica', 24, 'bold'))
+        title_label.pack(pady=20)
+        
+        # Form
+        form_frame = ttk.Frame(main_frame)
+        form_frame.pack(pady=20)
+        
+        # Username
+        ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
+        self.reg_username_var = tk.StringVar()
+        username_entry = ttk.Entry(form_frame, textvariable=self.reg_username_var, width=30)
+        username_entry.pack(pady=5)
+        
+        # Password
+        ttk.Label(form_frame, text="Password:", font=('Helvetica', 12)).pack()
+        self.reg_password_var = tk.StringVar()
+        password_entry = ttk.Entry(form_frame, textvariable=self.reg_password_var, show="•", width=30)
+        password_entry.pack(pady=5)
+        
+        # Confirm Password
+        ttk.Label(form_frame, text="Confirm Password:", font=('Helvetica', 12)).pack()
+        self.reg_confirm_password_var = tk.StringVar()
+        confirm_password_entry = ttk.Entry(form_frame, textvariable=self.reg_confirm_password_var, show="•", width=30)
+        confirm_password_entry.pack(pady=5)
+        
+        # Security Question
+        ttk.Label(form_frame, text="Security Question:", font=('Helvetica', 12)).pack()
+        self.reg_security_question_var = tk.StringVar()
+        security_question_combo = ttk.Combobox(form_frame, 
+                                             textvariable=self.reg_security_question_var,
+                                             values=[
+                                                 "What is your mother's maiden name?",
+                                                 "What was your first pet's name?",
+                                                 "What city were you born in?",
+                                                 "What is your favorite book?",
+                                                 "What was your first school's name?"
+                                             ],
+                                             state="readonly",
+                                             width=30)
+        security_question_combo.pack(pady=5)
+        
+        # Security Answer
+        ttk.Label(form_frame, text="Security Answer:", font=('Helvetica', 12)).pack()
+        self.reg_security_answer_var = tk.StringVar()
+        security_answer_entry = ttk.Entry(form_frame, textvariable=self.reg_security_answer_var, width=30)
+        security_answer_entry.pack(pady=5)
+        
+        # Buttons
+        button_frame = ttk.Frame(form_frame)
+        button_frame.pack(pady=20)
+        
+        ttk.Button(button_frame,
+                  text="Register",
+                  command=self.handle_register).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame,
+                  text="Back to Login",
+                  command=self.show_login_screen).pack(side=tk.LEFT, padx=5)
+>>>>>>> 8d26ff664283478775314ec85ccebfd889e03f7a
 
     def handle_register(self):
-        username = self.reg_username_var.get()
+        username = self.reg_username_var.get().strip()
         password = self.reg_password_var.get()
+        confirm_password = self.reg_confirm_password_var.get()
+        security_question = self.reg_security_question_var.get()
+        security_answer = self.reg_security_answer_var.get().strip()
         
-        if not username or not password:
+        # Validate inputs
+        if not username or not password or not confirm_password or not security_question or not security_answer:
             messagebox.showerror("Error", "Please fill in all fields")
             return
         
-        if self.auth_system.register(username, password):
+        if len(username) < 4:
+            messagebox.showerror("Error", "Username must be at least 4 characters long")
+            return
+        
+        if len(password) < 8:
+            messagebox.showerror("Error", "Password must be at least 8 characters long")
+            return
+        
+        if password != confirm_password:
+            messagebox.showerror("Error", "Passwords do not match")
+            return
+        
+        if self.auth_system.register(username, password, security_question, security_answer):
             messagebox.showinfo("Success", "Registration successful! Please login.")
             self.show_login_screen()
         else:
             messagebox.showerror("Error", "Username already exists")
 
+<<<<<<< HEAD
+=======
+    def show_forget_pass_screen(self):
+        # Clear window
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # Create main frame
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ttk.Label(main_frame,
+                               text="Password Recovery",
+                               font=('Helvetica', 24, 'bold'))
+        title_label.pack(pady=20)
+        
+        # Form
+        form_frame = ttk.Frame(main_frame)
+        form_frame.pack(pady=20)
+        
+        # Username
+        ttk.Label(form_frame, text="Username:", font=('Helvetica', 12)).pack()
+        self.for_username_var = tk.StringVar()
+        username_entry = ttk.Entry(form_frame, textvariable=self.for_username_var, width=30)
+        username_entry.pack(pady=5)
+        
+        # Security Question
+        ttk.Label(form_frame, text="Security Question:", font=('Helvetica', 12)).pack()
+        self.for_security_question_var = tk.StringVar()
+        security_question_label = ttk.Label(form_frame, 
+                                          textvariable=self.for_security_question_var,
+                                          font=('Helvetica', 12))
+        security_question_label.pack(pady=5)
+        
+        # Security Answer
+        ttk.Label(form_frame, text="Security Answer:", font=('Helvetica', 12)).pack()
+        self.for_security_answer_var = tk.StringVar()
+        security_answer_entry = ttk.Entry(form_frame, textvariable=self.for_security_answer_var, width=30)
+        security_answer_entry.pack(pady=5)
+        
+        # New Password
+        ttk.Label(form_frame, text="New Password:", font=('Helvetica', 12)).pack()
+        self.for_new_password_var = tk.StringVar()
+        new_password_entry = ttk.Entry(form_frame, textvariable=self.for_new_password_var, show="•", width=30)
+        new_password_entry.pack(pady=5)
+        
+        # Confirm New Password
+        ttk.Label(form_frame, text="Confirm New Password:", font=('Helvetica', 12)).pack()
+        self.for_confirm_password_var = tk.StringVar()
+        confirm_password_entry = ttk.Entry(form_frame, textvariable=self.for_confirm_password_var, show="•", width=30)
+        confirm_password_entry.pack(pady=5)
+        
+        def load_security_question():
+            username = self.for_username_var.get().strip()
+            if not username:
+                messagebox.showwarning("Warning", "Please enter your username")
+                return
+            
+            security_question = self.auth_system.get_security_question(username)
+            if security_question:
+                self.for_security_question_var.set(security_question)
+            else:
+                messagebox.showerror("Error", "Username not found")
+        
+        # Buttons
+        button_frame = ttk.Frame(form_frame)
+        button_frame.pack(pady=20)
+        
+        ttk.Button(button_frame,
+                  text="Load Security Question",
+                  command=load_security_question).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame,
+                  text="Reset Password",
+                  command=self.handle_forget_pass).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(button_frame,
+                  text="Back to Login",
+                  command=self.show_login_screen).pack(side=tk.LEFT, padx=5)
+
+    def handle_forget_pass(self):
+        username = self.for_username_var.get().strip()
+        security_answer = self.for_security_answer_var.get().strip()
+        new_password = self.for_new_password_var.get()
+        confirm_password = self.for_confirm_password_var.get()
+        
+        # Validate inputs
+        if not username or not security_answer or not new_password or not confirm_password:
+            messagebox.showerror("Error", "Please fill in all fields")
+            return
+        
+        if len(new_password) < 8:
+            messagebox.showerror("Error", "Password must be at least 8 characters long")
+            return
+        
+        if new_password != confirm_password:
+            messagebox.showerror("Error", "Passwords do not match")
+            return
+        
+        if self.auth_system.reset_password(username, security_answer, new_password):
+            messagebox.showinfo("Success", "Password has been reset successfully! Please login with your new password.")
+            self.show_login_screen()
+        else:
+            messagebox.showerror("Error", "Invalid security answer or username not found")
+
+>>>>>>> 8d26ff664283478775314ec85ccebfd889e03f7a
     def show_statistic(self):
         # Clear content area
         for widget in self.content_area.winfo_children():
             widget.destroy()
-
-        ttk.Label(self.content_area,
-                  text="Inventory Statistics",
-                  font=self.fonts['title']).pack(pady=10)
-
+        
+        # Create scrollable canvas
+        canvas = tk.Canvas(self.content_area, bg=self.colors['bg'])
+        scrollbar = ttk.Scrollbar(self.content_area, orient="vertical", command=canvas.yview)
+        
+        scrollable_frame = ttk.Frame(canvas, style='Main.TFrame')
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Title
+        ttk.Label(scrollable_frame,
+                text="Inventory Statistics",
+                font=self.fonts['title'],
+                background=self.colors['bg']).pack(pady=20)
+        
         # Get current products
         products = self.inventory_manager.get_all_products()
 
         if not products:
-            ttk.Label(self.content_area,
-                      text="No products available for statistics.",
-                      font=self.fonts['normal']).pack(pady=20)
+            ttk.Label(scrollable_frame,
+                    text="No products available for statistics.",
+                    font=self.fonts['normal']).pack(pady=20)
             return
 
-        # Prepare data
-        product_names = [p['name'] for p in products]
-        stock_quantities = [p['quantity'] for p in products]
+        # Calculate summary statistics
+        total_products = len(products)
+        total_quantity = sum(p['quantity'] for p in products)
+        total_value = sum(p['price'] * p['quantity'] for p in products)
 
+        # Summary Cards Frame
+        summary_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        summary_frame.pack(fill=tk.X, padx=30, pady=10)
+
+        # Summary Cards
+        summary_data = [
+            ("Total Products", total_products, self.colors['primary']),
+            ("Total Quantity", total_quantity, self.colors['success']),
+            ("Total Value", f"${total_value:,.2f}", self.colors['warning'])
+        ]
+
+        for title, value, color in summary_data:
+            card = ttk.Frame(summary_frame, style='Card.TFrame')
+            card.pack(side=tk.LEFT, expand=True, padx=10, pady=10)
+            
+            ttk.Label(card,
+                    text=title,
+                    font=self.fonts['normal']).pack(pady=5)
+            
+            ttk.Label(card,
+                    text=str(value),
+                    font=self.fonts['title'],
+                    foreground=color).pack(pady=5)
+
+        # Prepare data for charts
+        # Category distribution
         category_totals = defaultdict(int)
         for p in products:
             category_totals[p['category']] += p['quantity']
@@ -1060,25 +1463,213 @@ class InventoryUI:
         categories = list(category_totals.keys())
         quantities_by_category = list(category_totals.values())
 
-        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-        fig.tight_layout(pad=5)
+        # Top 5 most stocked items
+        sorted_by_quantity = sorted(products, key=lambda x: x['quantity'], reverse=True)[:5]
+        top_quantity_names = [p['name'] for p in sorted_by_quantity]
+        top_quantity_values = [p['quantity'] for p in sorted_by_quantity]
 
-        # Bar chart for stock quantity by product
-        axs[0].bar(product_names, stock_quantities, color='skyblue')
-        axs[0].set_title('Current Stock by Product')
-        axs[0].set_xlabel('Product Name')
-        axs[0].set_ylabel('Quantity in Stock')
-        axs[0].tick_params(axis='x', rotation=45)
+        # Top 5 most expensive items
+        sorted_by_price = sorted(products, key=lambda x: x['price'], reverse=True)[:5]
+        top_price_names = [p['name'] for p in sorted_by_price]
+        top_price_values = [p['price'] for p in sorted_by_price]
 
-        # Pie chart for category totals
-        axs[1].pie(quantities_by_category, labels=categories, autopct='%1.1f%%', startangle=90)
-        axs[1].axis('equal')
-        axs[1].set_title('Inventory Distribution by Category')
+        # Low stock items (quantity < 5)
+        low_stock_items = [p for p in products if p['quantity'] < 5]
+        low_stock_names = [p['name'] for p in low_stock_items]
+        low_stock_values = [p['quantity'] for p in low_stock_items]
 
-        # Embed the figure into Tkinter
-        canvas = FigureCanvasTkAgg(fig, master=self.content_area)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        # Create each chart in its own card frame
+        # Chart 1: Category Distribution (Pie Chart)
+        chart1_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart1_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart1_frame, 
+                text="Inventory Distribution by Category", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        fig1, ax1 = plt.subplots(figsize=(10, 7))
+        ax1.pie(quantities_by_category, labels=categories, autopct='%1.1f%%', startangle=90,
+                shadow=True, explode=[0.05]*len(categories))
+        ax1.axis('equal')
+        
+        fig1.tight_layout()
+        canvas1 = FigureCanvasTkAgg(fig1, master=chart1_frame)
+        canvas1.draw()
+        canvas1.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Chart 2: Top 5 Most Stocked Items
+        chart2_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart2_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart2_frame, 
+                text="Top 5 Most Stocked Items", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        fig2, ax2 = plt.subplots(figsize=(10, 5))
+        bars = ax2.bar(top_quantity_names, top_quantity_values, color='royalblue')
+        ax2.set_xlabel('Product')
+        ax2.set_ylabel('Quantity')
+        ax2.tick_params(axis='x', rotation=45)
+        ax2.grid(True, linestyle='--', alpha=0.7, axis='y')
+        
+        # Add data labels on top of each bar
+        for bar in bars:
+            height = bar.get_height()
+            ax2.annotate(f'{height}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+        
+        fig2.tight_layout()
+        canvas2 = FigureCanvasTkAgg(fig2, master=chart2_frame)
+        canvas2.draw()
+        canvas2.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Chart 3: Top 5 Most Expensive Items
+        chart3_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart3_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart3_frame, 
+                text="Top 5 Most Expensive Items", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        fig3, ax3 = plt.subplots(figsize=(10, 5))
+        bars = ax3.bar(top_price_names, top_price_values, color='forestgreen')
+        ax3.set_xlabel('Product')
+        ax3.set_ylabel('Price ($)')
+        ax3.tick_params(axis='x', rotation=45)
+        ax3.grid(True, linestyle='--', alpha=0.7, axis='y')
+        
+        # Add data labels on top of each bar
+        for bar in bars:
+            height = bar.get_height()
+            ax3.annotate(f'${height:,.2f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+        
+        fig3.tight_layout()
+        canvas3 = FigureCanvasTkAgg(fig3, master=chart3_frame)
+        canvas3.draw()
+        canvas3.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Chart 4: Low Stock Items
+        chart4_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        chart4_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Label(chart4_frame, 
+                text="Low Stock Items (Quantity < 5)", 
+                font=self.fonts['header']).pack(pady=10)
+        
+        if low_stock_items:
+            fig4, ax4 = plt.subplots(figsize=(10, 5))
+            bars = ax4.bar(low_stock_names, low_stock_values, color='crimson')
+            ax4.set_xlabel('Product')
+            ax4.set_ylabel('Quantity')
+            ax4.tick_params(axis='x', rotation=45)
+            ax4.grid(True, linestyle='--', alpha=0.7, axis='y')
+            
+            # Add data labels on top of each bar
+            for bar in bars:
+                height = bar.get_height()
+                ax4.annotate(f'{height}',
+                            xy=(bar.get_x() + bar.get_width() / 2, height),
+                            xytext=(0, 3),
+                            textcoords="offset points",
+                            ha='center', va='bottom')
+            
+            fig4.tight_layout()
+            canvas4 = FigureCanvasTkAgg(fig4, master=chart4_frame)
+            canvas4.draw()
+            canvas4.get_tk_widget().pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        else:
+            ttk.Label(chart4_frame,
+                    text="No low stock items found.",
+                    font=self.fonts['normal']).pack(pady=20)
+
+        # Add download buttons for each chart
+        def save_chart_as_png(fig, title):
+            file_path = tk.filedialog.asksaveasfilename(
+                defaultextension=".png",
+                filetypes=[("PNG files", "*.png"), ("All files", "*.*")],
+                title=f"Save {title} as PNG"
+            )
+            if file_path:
+                fig.savefig(file_path, format='png', dpi=300, bbox_inches='tight')
+                messagebox.showinfo("Success", f"{title} saved successfully as PNG!")
+
+        # Add download buttons for each chart
+        for i, (fig, title) in enumerate([
+            (fig1, "Category Distribution"),
+            (fig2, "Top Stocked Items"),
+            (fig3, "Most Expensive Items"),
+            (fig4, "Low Stock Items") if low_stock_items else None
+        ]):
+            if fig:
+                button_frame = ttk.Frame(scrollable_frame)
+                button_frame.pack(pady=5)
+                ttk.Button(button_frame,
+                          text=f"Save {title} as PNG",
+                          command=lambda f=fig, t=title: save_chart_as_png(f, t)).pack(pady=5)
+
+        # Add "Save All as PDF" button
+        def save_all_charts_pdf():
+            file_path = tk.filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                title="Save All Charts as PDF"
+            )
+            if file_path:
+                from matplotlib.backends.backend_pdf import PdfPages
+                with PdfPages(file_path) as pdf:
+                    # Add summary statistics as first page
+                    fig_summary, ax_summary = plt.subplots(figsize=(10, 5))
+                    ax_summary.axis('off')
+                    summary_text = f"Inventory Statistics Summary\n\n" \
+                                 f"Total Products: {total_products}\n" \
+                                 f"Total Quantity: {total_quantity}\n" \
+                                 f"Total Value: ${total_value:,.2f}"
+                    ax_summary.text(0.5, 0.5, summary_text, 
+                                  ha='center', va='center', 
+                                  fontsize=12, transform=ax_summary.transAxes)
+                    pdf.savefig(fig_summary, bbox_inches='tight')
+                    plt.close(fig_summary)
+
+                    # Save each chart with its title
+                    for fig, title in [
+                        (fig1, "Category Distribution"),
+                        (fig2, "Top 5 Most Stocked Items"),
+                        (fig3, "Top 5 Most Expensive Items"),
+                        (fig4, "Low Stock Items") if low_stock_items else None
+                    ]:
+                        if fig:
+                            # Add title to the figure
+                            fig.suptitle(title, fontsize=14, y=1.02)
+                            pdf.savefig(fig, bbox_inches='tight')
+                            plt.close(fig)
+                
+                messagebox.showinfo("Success", "All charts saved successfully as PDF!")
+
+        # Add the "Save All as PDF" button
+        save_all_frame = ttk.Frame(scrollable_frame, style='Card.TFrame')
+        save_all_frame.pack(fill=tk.X, padx=30, pady=20)
+        
+        ttk.Button(save_all_frame,
+                  text="Save All Charts as PDF",
+                  style='Success.TButton',
+                  command=save_all_charts_pdf).pack(pady=10)
+
+        # Pack the canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Make sure scrolling works with mousewheel
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
     def run(self):
         self.root.mainloop()
