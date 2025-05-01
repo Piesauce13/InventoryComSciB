@@ -9,6 +9,7 @@ from collections import defaultdict
 from PIL import  ImageTk, Image
 
 
+
 class InventoryUI:
     def __init__(self, auth_system, inventory_manager):
         self.auth_system = auth_system
@@ -107,7 +108,7 @@ class InventoryUI:
         # Buttons
         login_button = ttk.Button(self.root, text="Login", command=self.show_login_screen)
         signup_button = ttk.Button(self.root, text="Signup", command=self.show_register_screen)
-        forget_button = ttk.Button(self.root, text="Change Password", command=self.show_forget_pass_screen)
+        forget_button = ttk.Button(self.root, text="Forget Password", command=self.show_forget_pass_screen)
 
         # Place buttons on the canvas (centered below the text)
         self.canvas.create_window(center_x - 120, 300, window=login_button, width=100, height=40)
@@ -784,7 +785,7 @@ class InventoryUI:
         search_type_var = tk.StringVar(value="id")
         search_type_combo = ttk.Combobox(search_frame,
                                          textvariable=search_type_var,
-                                         values=["id", "name", "category", "notes"],
+                                         values=["id", "name", "category"],
                                          state="readonly",
                                          width=10)
         search_type_combo.pack(side=tk.LEFT, padx=5)
@@ -961,7 +962,7 @@ class InventoryUI:
         search_type_var = tk.StringVar(value="id")
         search_type_combo = ttk.Combobox(search_frame,
                                          textvariable=search_type_var,
-                                         values=["id", "name", "category", "notes"],
+                                         values=["id", "name", "category"],
                                          state="readonly",
                                          width=10)
         search_type_combo.pack(side=tk.LEFT, padx=5)
@@ -1070,7 +1071,7 @@ class InventoryUI:
             widget.destroy()
 
         # Create table
-        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity')
+        columns = ('ID', 'Name', 'Category', 'Price', 'Quantity', 'Expired Date')
         tree = ttk.Treeview(self.results_frame, columns=columns, show='headings')
 
         for col in columns:
@@ -1089,7 +1090,8 @@ class InventoryUI:
                 product['name'],
                 product['category'],
                 f"${product['price']:.2f}",
-                product['quantity']
+                product['quantity'],
+                product['expiry_date'] if product['expiry_date'] else 'N/A'
             ))
 
     def handle_login(self):

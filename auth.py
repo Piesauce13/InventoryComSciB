@@ -85,7 +85,7 @@ class AuthSystem:
 
         if username not in usernames_list:
             # Clear products for new user
-            self.db.clear_products_for_new_user()
+            # self.db.clear_products_for_new_user()
             # Register the new user
             self.__insert_user_to_db(username, hash_password, role, security_question, security_answer)
             return True
